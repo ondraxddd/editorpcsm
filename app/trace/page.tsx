@@ -3,6 +3,7 @@
 import React, { useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
 
+// Dynamický import editoru pro Next.js (SSR safe)
 const Editor = dynamic(() => import('@monaco-editor/react'), { ssr: false });
 
 export default function ExperianTraceUltra() {
@@ -10,6 +11,7 @@ export default function ExperianTraceUltra() {
   const editorRef = useRef<any>(null);
 
   // --- REKURZIVNÍ FORMÁTOVAČ ---
+  // Vytváří odsazení tak, aby vnitřek byl vnořený a OUT zůstal viditelný pod IN
   const formatTraceLogic = () => {
     if (!editorRef.current) return;
     
@@ -30,21 +32,21 @@ export default function ExperianTraceUltra() {
       const isIn = line.match(/^IN\s*:/i);
       const isValue = line.match(/^VALUE\s*:/i);
 
-      // Pokud je to OUT, vracíme se zpět už pro tento řádek
+      // Pokud je to OUT, snižujeme úroveň PŘED vypsáním řádku
       if (isOut) {
         indentLevel = Math.max(0, indentLevel - 1);
       }
 
       let currentLineIndent = indentLevel;
 
-      // VALUE chceme mít ještě o kousek dál
+      // VALUE odsazujeme o úroveň hlouběji než aktuální kontext
       if (isValue) {
         currentLineIndent += 1;
       }
 
       newLines.push(tab.repeat(currentLineIndent) + line);
 
-      // Pokud je to IN, vše POTÉ bude vnořené
+      // Pokud je to IN, vše pod ním bude o úroveň hlouběji
       if (isIn) {
         indentLevel++;
       }
@@ -57,7 +59,11 @@ export default function ExperianTraceUltra() {
     if (file) {
       setFileName(file.name);
       const reader = new FileReader();
-      reader.onload = (ev) => editorRef.current?.setValue(ev.target?.result);
+      reader.onload = (ev) => {
+        if (editorRef.current) {
+          editorRef.current.setValue(ev.target?.result as string);
+        }
+      };
       reader.readAsText(file);
     }
   };
@@ -65,13 +71,22 @@ export default function ExperianTraceUltra() {
   const handleEditorWillMount = (monaco: any) => {
     monaco.languages.register({ id: 'pcsm-trace' });
 
+    // Injekce CSS pro breakpointy (červená kolečka)
     if (typeof document !== 'undefined') {
       const style = document.createElement('style');
-      style.innerHTML = `.myBreakpoint { background: #ff4444; border-radius: 50%; width: 12px!important; height: 12px!important; margin-left: 5px; }`;
+      style.innerHTML = `
+        .myBreakpoint { 
+          background: #ff4444; 
+          border-radius: 50%; 
+          width: 12px !important; 
+          height: 12px !important; 
+          margin-left: 5px; 
+        }
+      `;
       document.head.appendChild(style);
     }
 
-    // 1. BARVY
+    // Definice barev pro Trace
     monaco.languages.setMonarchTokensProvider('pcsm-trace', {
       ignoreCase: true,
       tokenizer: {
@@ -86,19 +101,7 @@ export default function ExperianTraceUltra() {
       }
     });
 
-    // 2. FOLDING KONFIGURACE - KLÍČOVÁ ZMĚNA
-    monaco.languages.setLanguageConfiguration('pcsm-trace', {
-      folding: {
-        offSide: true,
-        markers: {
-          // Start hledá IN: na začátku řádku (po případných mezerách)
-          start: /^\s*IN\s*:/i,
-          // End hledá OUT: na začátku řádku
-          end: /^\s*OUT\s*:/i
-        }
-      }
-    });
-
+    // Definice tématu
     monaco.editor.defineTheme('traceTheme', {
       base: 'vs-dark',
       inherit: true,
@@ -113,49 +116,75 @@ export default function ExperianTraceUltra() {
         'editor.background': '#0F172A',
         'editorGutter.background': '#0F172A',
         'editor.glyphMarginBackground': '#1E293B',
+        'editor.lineHighlightBackground': '#1E293B33',
       }
     });
   };
 
-  const handleEditorDidMount = (editor: any) => {
+  const handleEditorDidMount = (editor: any, monaco: any) => {
     editorRef.current = editor;
+
+    // Obsluha přidávání/debírání breakpointů
     editor.onMouseDown((e: any) => {
+      // 2 = Glyph Margin (oblast pro zarážky)
       if (e.target.type === 2) { 
         const line = e.target.position.lineNumber;
-        const decs = editor.getLineDecorations(line).filter((d: any) => d.options.glyphMarginClassName === 'myBreakpoint');
-        if (decs.length > 0) editor.deltaDecorations([decs[0].id], []);
-        else editor.deltaDecorations([], [{ range: new monaco.Range(line, 1, line, 1), options: { isWholeLine: true, glyphMarginClassName: 'myBreakpoint' } }]);
+        const currentDecorations = editor.getLineDecorations(line);
+        const bpoints = currentDecorations.filter(
+          (d: any) => d.options.glyphMarginClassName === 'myBreakpoint'
+        );
+
+        if (bpoints.length > 0) {
+          editor.deltaDecorations([bpoints[0].id], []);
+        } else {
+          editor.deltaDecorations([], [{ 
+            range: new monaco.Range(line, 1, line, 1), 
+            options: { 
+              isWholeLine: true, 
+              glyphMarginClassName: 'myBreakpoint' 
+            } 
+          }]);
+        }
       }
     });
   };
 
   return (
-    <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', background: '#0f172a', color: 'white' }}>
+    <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', background: '#0f172a', color: 'white', fontFamily: 'sans-serif' }}>
       <header style={{ padding: '10px 20px', borderBottom: '1px solid #334155', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h1 style={{ fontSize: '1.2rem' }}>Experian Trace Ultra 🔴</h1>
+        <div>
+          <h1 style={{ fontSize: '1.2rem', margin: 0 }}>Experian Trace Ultra-View 🔴</h1>
+          <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>{fileName}</div>
+        </div>
         <div style={{ display: 'flex', gap: '10px' }}>
-          <input type="file" onChange={handleFileUpload} />
-          <button onClick={formatTraceLogic} style={{ padding: '8px 15px', background: '#22c55e', borderRadius: '4px', cursor: 'pointer', border: 'none', color: 'white' }}>
-            🪄 Re-Format
+          <input type="file" onChange={handleFileUpload} style={{ fontSize: '0.8rem' }} />
+          <button 
+            onClick={formatTraceLogic} 
+            style={{ padding: '8px 15px', background: '#22c55e', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}
+          >
+            🪄 Re-Format & Structure
           </button>
         </div>
       </header>
+
       <div style={{ flex: 1 }}>
         <Editor
           height="100%"
           defaultLanguage="pcsm-trace"
           theme="traceTheme"
-          onMount={handleEditorDidMount}
+          onMount={(editor, monaco) => handleEditorDidMount(editor, monaco)}
           beforeMount={handleEditorWillMount}
           options={{
+            fontSize: 13,
             glyphMargin: true,
             folding: true,
-            // Tato strategie 'indentation' je pro tvůj případ s odsazeným vnitřkem nejlepší
-            foldingStrategy: 'indentation', 
+            foldingStrategy: 'indentation', // Klíčové pro sbalování podle tabulátorů
             showFoldingControls: 'always',
             lineNumbers: 'on',
+            minimap: { enabled: true },
             wordWrap: 'off',
-            automaticLayout: true
+            automaticLayout: true,
+            scrollBeyondLastLine: false,
           }}
         />
       </div>
