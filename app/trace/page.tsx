@@ -9,7 +9,7 @@ export default function ExperianTraceUltra() {
   const [fileName, setFileName] = useState("Nahrajte .txt trace file");
   const editorRef = useRef<any>(null);
 
-  // --- REKURZIVNÍ FORMÁTOVAČ S PODPOROU PRO VIDITELNÝ OUT ---
+  // --- REKURZIVNÍ FORMÁTOVAČ ---
   const formatTraceLogic = () => {
     if (!editorRef.current) return;
     
@@ -30,22 +30,21 @@ export default function ExperianTraceUltra() {
       const isIn = line.match(/^IN\s*:/i);
       const isValue = line.match(/^VALUE\s*:/i);
 
-      // Pokud je to OUT, vracíme se o úroveň zpět PŘED vypsáním,
-      // aby OUT lícovalo se svým IN
+      // Pokud je to OUT, vracíme se zpět už pro tento řádek
       if (isOut) {
         indentLevel = Math.max(0, indentLevel - 1);
       }
 
       let currentLineIndent = indentLevel;
 
-      // VALUE je vždy o jeden tab hlouběji než aktuální úroveň
+      // VALUE chceme mít ještě o kousek dál
       if (isValue) {
         currentLineIndent += 1;
       }
 
       newLines.push(tab.repeat(currentLineIndent) + line);
 
-      // Pokud je to IN, zvyšujeme úroveň pro obsah uvnitř
+      // Pokud je to IN, vše POTÉ bude vnořené
       if (isIn) {
         indentLevel++;
       }
@@ -66,14 +65,13 @@ export default function ExperianTraceUltra() {
   const handleEditorWillMount = (monaco: any) => {
     monaco.languages.register({ id: 'pcsm-trace' });
 
-    // CSS pro Breakpointy (červená kolečka)
     if (typeof document !== 'undefined') {
       const style = document.createElement('style');
       style.innerHTML = `.myBreakpoint { background: #ff4444; border-radius: 50%; width: 12px!important; height: 12px!important; margin-left: 5px; }`;
       document.head.appendChild(style);
     }
 
-    // 1. DEFINICE BAREV
+    // 1. BARVY
     monaco.languages.setMonarchTokensProvider('pcsm-trace', {
       ignoreCase: true,
       tokenizer: {
@@ -88,18 +86,19 @@ export default function ExperianTraceUltra() {
       }
     });
 
-    // 2. DEFINICE FOLDINGU (Sbalování)
-    // Nastaveno tak, aby OUT: byl brán jako konec, ale zůstal viditelný
+    // 2. FOLDING KONFIGURACE - KLÍČOVÁ ZMĚNA
     monaco.languages.setLanguageConfiguration('pcsm-trace', {
       folding: {
+        offSide: true,
         markers: {
+          // Start hledá IN: na začátku řádku (po případných mezerách)
           start: /^\s*IN\s*:/i,
+          // End hledá OUT: na začátku řádku
           end: /^\s*OUT\s*:/i
         }
       }
     });
 
-    // 3. TÉMA
     monaco.editor.defineTheme('traceTheme', {
       base: 'vs-dark',
       inherit: true,
@@ -114,49 +113,33 @@ export default function ExperianTraceUltra() {
         'editor.background': '#0F172A',
         'editorGutter.background': '#0F172A',
         'editor.glyphMarginBackground': '#1E293B',
-        'editor.lineHighlightBackground': '#1E293B33',
       }
     });
   };
 
-  const handleEditorDidMount = (editor: any, monaco: any) => {
+  const handleEditorDidMount = (editor: any) => {
     editorRef.current = editor;
-
-    // Obsluha klikání na breakpointy
     editor.onMouseDown((e: any) => {
       if (e.target.type === 2) { 
         const line = e.target.position.lineNumber;
         const decs = editor.getLineDecorations(line).filter((d: any) => d.options.glyphMarginClassName === 'myBreakpoint');
-        if (decs.length > 0) {
-          editor.deltaDecorations([decs[0].id], []);
-        } else {
-          editor.deltaDecorations([], [{
-            range: new monaco.Range(line, 1, line, 1),
-            options: { isWholeLine: true, glyphMarginClassName: 'myBreakpoint' }
-          }]);
-        }
+        if (decs.length > 0) editor.deltaDecorations([decs[0].id], []);
+        else editor.deltaDecorations([], [{ range: new monaco.Range(line, 1, line, 1), options: { isWholeLine: true, glyphMarginClassName: 'myBreakpoint' } }]);
       }
     });
   };
 
   return (
-    <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', background: '#0f172a', color: 'white', fontFamily: 'sans-serif' }}>
+    <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', background: '#0f172a', color: 'white' }}>
       <header style={{ padding: '10px 20px', borderBottom: '1px solid #334155', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div>
-          <h1 style={{ fontSize: '1.2rem', margin: 0 }}>Experian Trace Ultra-View 🔴</h1>
-          <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>{fileName}</div>
-        </div>
+        <h1 style={{ fontSize: '1.2rem' }}>Experian Trace Ultra 🔴</h1>
         <div style={{ display: 'flex', gap: '10px' }}>
-          <input type="file" onChange={handleFileUpload} style={{ fontSize: '0.8rem' }} />
-          <button 
-            onClick={formatTraceLogic} 
-            style={{ padding: '8px 15px', background: '#22c55e', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}
-          >
-            🪄 Re-Format & Structure
+          <input type="file" onChange={handleFileUpload} />
+          <button onClick={formatTraceLogic} style={{ padding: '8px 15px', background: '#22c55e', borderRadius: '4px', cursor: 'pointer', border: 'none', color: 'white' }}>
+            🪄 Re-Format
           </button>
         </div>
       </header>
-
       <div style={{ flex: 1 }}>
         <Editor
           height="100%"
@@ -165,17 +148,14 @@ export default function ExperianTraceUltra() {
           onMount={handleEditorDidMount}
           beforeMount={handleEditorWillMount}
           options={{
-            fontSize: 13,
             glyphMargin: true,
             folding: true,
-            foldingHighlight: true,
+            // Tato strategie 'indentation' je pro tvůj případ s odsazeným vnitřkem nejlepší
+            foldingStrategy: 'indentation', 
+            showFoldingControls: 'always',
             lineNumbers: 'on',
-            minimap: { enabled: true },
             wordWrap: 'off',
-            automaticLayout: true,
-            scrollBeyondLastLine: false,
-            // Tato volba zajistí, že uvidíš šipky pro folding hned
-            showFoldingControls: 'always'
+            automaticLayout: true
           }}
         />
       </div>
