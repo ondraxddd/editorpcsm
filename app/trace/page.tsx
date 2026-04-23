@@ -117,17 +117,20 @@ if (line.match(/^IN\s*:/i)) {
     }
 
     monaco.languages.setMonarchTokensProvider('pcsm-trace', {
-      tokenizer: {
-        root: [
-          [/^.*IN :.*$/, 'keyword'],
-          [/^.*OUT :.*$/, 'keyword'],
-          [/^.*GETTING.*$/, 'comment'],
-          [/^.*SETTING.*$/, 'attribute'],
-          [/^.*VALUE.*$/, 'number'],
-          [/'[^']*'/, 'string'],
-        ]
-      }
-    });
+  tokenizer: {
+    root: [
+      // Upraveno pro IN: i IN :
+      [/^.*IN\s*:.*$/, 'keyword'],
+      // Upraveno pro OUT: i OUT :
+      [/^.*OUT\s*:.*$/, 'keyword'],
+      // Upraveno pro ostatní
+      [/^.*GETTING\s*:.*$/, 'comment'],
+      [/^.*SETTING\s*:.*$/, 'attribute'],
+      [/^.*VALUE\s*:.*$/, 'number'],
+      [/'[^']*'/, 'string'],
+    ]
+  }
+});
 
     monaco.editor.defineTheme('traceTheme', {
   base: 'vs-dark',
