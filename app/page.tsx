@@ -18,7 +18,6 @@ export default function PcsmCodeEditor() {
     const tab = "    "; 
     const formattedLines = [];
 
-    // Klíčová slova - upraveno pro komplexní PCSM logiku
     const openKeywords = /^(IF|WHILE|FUNCTION)\b/i;
     const closeKeywords = /^(ENDIF|END\s+IF|ENDWHILE|END\s+WHILE|END\s+FUNCTION)\b/i;
     const middleKeywords = /^(ELSE|ELSEIF)\b/i;
@@ -31,8 +30,6 @@ export default function PcsmCodeEditor() {
         continue;
       }
 
-      // 1. Detekce snížení úrovně (pro ELSE, ELSEIF a ENDIF)
-      // Musí se provést PŘED přidáním řádku do pole
       const isClosing = closeKeywords.test(line);
       const isMiddle = middleKeywords.test(line);
 
@@ -40,15 +37,11 @@ export default function PcsmCodeEditor() {
         indentLevel = Math.max(0, indentLevel - 1);
       }
 
-      // 2. Přidání řádku s aktuálním odsazením
       formattedLines.push(tab.repeat(indentLevel) + line);
 
-      // 3. Detekce zvýšení úrovně pro DALŠÍ řádek
       const isOpening = openKeywords.test(line);
       
-      // Zvýšíme indent, pokud řádek otevírá blok nebo je to větev ELSE
       if (isOpening || isMiddle) {
-        // Kontrola, zda není ENDIF na stejném řádku (one-liner)
         const hasEndOnSameLine = closeKeywords.test(line);
         if (!hasEndOnSameLine) {
           indentLevel++;
@@ -60,26 +53,23 @@ export default function PcsmCodeEditor() {
   };
 
   const handleEditorWillMount = (monaco: any) => {
-    // Registrace PCSM jazyka
     monaco.languages.register({ id: 'pcsm' });
 
-    // Syntax Highlighting
     monaco.languages.setMonarchTokensProvider('pcsm', {
       ignoreCase: true,
       tokenizer: {
         root: [
           [/\b(IF|THEN|ELSE|ELSEIF|ENDIF|END\s+IF|WHILE|ENDWHILE|FUNCTION|RETURN|END\s+FUNCTION|SUBPOP|INLIST|FIND|TODATE)\b/i, 'keyword'],
-          [/'[^']*'/, 'attribute'], // Pole v uvozovkách
-          [/"[^"]*"/, 'string'],      // Stringy
-          [/\/\/.*$/, 'comment'],     // Komentáře //
-          [/'\s.*$/, 'comment'],      // Komentáře '
+          [/'[^']*'/, 'attribute'],
+          [/"[^"]*"/, 'string'],
+          [/\/\/.*$/, 'comment'],
+          [/'\s.*$/, 'comment'],
           [/\b\d+(\.\d+)?\b/, 'number'],
           [/\b(TRUE|FALSE)\b/i, 'keyword.constant'],
         ]
       }
     });
 
-    // Language Configuration pro Folding a Párování
     monaco.languages.setLanguageConfiguration('pcsm', {
       comments: {
         lineComment: '//',
@@ -99,7 +89,6 @@ export default function PcsmCodeEditor() {
       ]
     });
 
-    // Definice Tématu
     monaco.editor.defineTheme('pcsmTheme', {
       base: 'vs-dark',
       inherit: true,
@@ -132,7 +121,7 @@ export default function PcsmCodeEditor() {
         borderBottom: '1px solid #333',
         color: '#ccc'
       }}>
-        <h1 style={{ fontSize: '1rem', margin: 0 }}>PCSM Script Editor v2.0</h1>
+        <h1 style={{ fontSize: '1rem', margin: 0 }}>PCSM Script Editor v2.1</h1>
         <button 
           onClick={formatCode}
           style={{
@@ -163,7 +152,10 @@ export default function PcsmCodeEditor() {
             automaticLayout: true,
             tabSize: 4,
             folding: true,
-            renderIndentGuides: true,
+            // OPRAVA: renderIndentGuides byl nahrazen tímto objektem
+            guides: {
+                indentation: true
+            },
             bracketPairColorization: { enabled: true },
           }}
         />
