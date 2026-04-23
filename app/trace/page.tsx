@@ -99,68 +99,50 @@ if (line.match(/^IN\s*:/i)) {
   };
 
   const handleEditorWillMount = (monaco: any) => {
-    monaco.languages.register({ id: 'pcsm-trace' });
+  monaco.languages.register({ id: 'pcsm-trace' });
 
-    // CSS pro Breakpointy
-    if (typeof document !== 'undefined') {
-      const style = document.createElement('style');
-      style.innerHTML = `
-        .myBreakpoint {
-          background: #ff4444;
-          border-radius: 50%;
-          width: 12px !important;
-          height: 12px !important;
-          margin-left: 5px;
-        }
-      `;
-      document.head.appendChild(style);
+  // 1. Barvy (včetně ošetření mezer u dvojteček)
+  monaco.languages.setMonarchTokensProvider('pcsm-trace', {
+    tokenizer: {
+      root: [
+        [/^\s*IN\s*:.*$/, 'keyword'],
+        [/^\s*OUT\s*:.*$/, 'keyword'],
+        [/^\s*GETTING\s*:.*$/, 'comment'],
+        [/^\s*SETTING\s*:.*$/, 'attribute'],
+        [/^\s*VALUE\s*:.*$/, 'number'],
+        [/'[^']*'/, 'string'],
+      ]
     }
+  });
 
-    monaco.languages.setMonarchTokensProvider('pcsm-trace', {
-  tokenizer: {
-    root: [
-      // Upraveno pro IN: i IN :
-      [/^.*IN\s*:.*$/, 'keyword'],
-      // Upraveno pro OUT: i OUT :
-      [/^.*OUT\s*:.*$/, 'keyword'],
-      // Upraveno pro ostatní
-      [/^.*GETTING\s*:.*$/, 'comment'],
-      [/^.*SETTING\s*:.*$/, 'attribute'],
-      [/^.*VALUE\s*:.*$/, 'number'],
-      [/'[^']*'/, 'string'],
-    ]
-  }
-});
+  // 2. Sbalování kódu (FOLDING)
+  monaco.languages.setLanguageConfiguration('pcsm-trace', {
+    folding: {
+      markers: {
+        start: /^\s*IN\s*:/i,
+        end: /^\s*OUT\s*:/i
+      }
+    }
+  });
 
-    monaco.editor.defineTheme('traceTheme', {
-  base: 'vs-dark',
-  inherit: true,
-  rules: [
-    // IN a OUT: Výrazná oranžová pro navigaci v procesu
-    { token: 'keyword', foreground: 'FF9D00', fontStyle: 'bold' }, 
-    
-    // GETTING: Místo šedé teď bude elegantní levandulová/fialová
-    { token: 'comment', foreground: 'A78BFA' }, 
-    
-    // SETTING: Jasná neonově modrá, aby z logu "vyskakovalo", kde se mění data
-    { token: 'attribute', foreground: '38BDF8', fontStyle: 'bold' }, 
-    
-    // VALUE: Svítivá mentolová/zelená pro samotné hodnoty
-    { token: 'number', foreground: '34D399' }, 
-    
-    // Atributy v uvozovkách: Jemná žlutá/krémová
-    { token: 'string', foreground: 'FDE047' }, 
-  ],
-  colors: { 
-    'editor.background': '#0F172A',         // Velmi tmavě modrá (Slate 950)
-    'editor.lineHighlightBackground': '#1E293B', // Zvýraznění aktuálního řádku
-    'editorGutter.background': '#0F172A',   // Pozadí pruhu s čísly
-    'editor.glyphMarginBackground': '#1E293B', // Pruh pro breakpointy
-    'editorLineNumber.foreground': '#475569', // Barva čísel řádků
-    'editorCursor.foreground': '#F8FAFC',    // Barva kurzoru
-  }
-});
-  };
+  // 3. Téma (zůstává stejné)
+  monaco.editor.defineTheme('traceTheme', {
+    base: 'vs-dark',
+    inherit: true,
+    rules: [
+      { token: 'keyword', foreground: 'FF9D00', fontStyle: 'bold' }, 
+      { token: 'comment', foreground: 'A78BFA' }, 
+      { token: 'attribute', foreground: '38BDF8', fontStyle: 'bold' }, 
+      { token: 'number', foreground: '34D399' }, 
+      { token: 'string', foreground: 'FDE047' }, 
+    ],
+    colors: { 
+      'editor.background': '#0F172A',
+      'editorGutter.background': '#0F172A',
+      'editor.glyphMarginBackground': '#1E293B'
+    }
+  });
+};
 
   return (
     <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', background: '#0f172a', color: 'white', fontFamily: 'sans-serif' }}>
