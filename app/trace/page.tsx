@@ -6,10 +6,10 @@ import dynamic from 'next/dynamic';
 const Editor = dynamic(() => import('@monaco-editor/react'), { ssr: false });
 
 export default function ExperianTraceUltra() {
-  const [fileName, setFileName] = useState("Nahrajte .txt trace file");
+  const [fileName, setFileName] = useState("Žádný soubor nevybrán");
   const editorRef = useRef<any>(null);
 
-  // --- REKURZIVNÍ FORMÁTOVAČ PRO SPECIFICKOU SYNTAX ---
+  // --- REKURZIVNÍ FORMÁTOVAČ ---
   const formatTraceLogic = () => {
     if (!editorRef.current) return;
     
@@ -20,38 +20,29 @@ export default function ExperianTraceUltra() {
     const newLines = [];
 
     for (let i = 0; i < lines.length; i++) {
-      // 1. Očistíme řádek od prefixu "1:TestExec:" a od původních mezer
+      // Odstranění balastu "1:TestExec:" a trimování
       let cleanLine = lines[i].replace(/^\d+:TestExec:/i, '').trim();
       
       if (cleanLine === "" || cleanLine.startsWith('*****')) {
-        newLines.push(lines[i]); // Ponecháme hlavičky beze změny
+        newLines.push(lines[i]); 
         continue;
       }
 
-      // Detekce klíčových slov
       const isOut = cleanLine.match(/^OUT\s*:/i);
       const isIn = cleanLine.match(/^IN\s*:/i);
       const isValue = cleanLine.match(/^\*\s*Value\s*:/i);
-      const isGettingSetting = cleanLine.match(/^\*\s*(Getting|Setting)\s*:/i);
 
-      // 2. Logika odsazení
-      // Pokud je to OUT, jdeme o úroveň zpět PŘED vypsáním
       if (isOut) {
         indentLevel = Math.max(0, indentLevel - 1);
       }
 
       let currentLineIndent = indentLevel;
-
-      // VALUE chceme mít vždy o úroveň hlouběji než Getting/Setting
       if (isValue) {
         currentLineIndent += 1;
       }
 
-      // 3. Sestavení řádku s novým prefixem (nebo bez něj, podle chuti)
-      // Tady přidáváme tabulátory podle naší vypočítané hloubky
       newLines.push(tab.repeat(currentLineIndent) + cleanLine);
 
-      // 4. Pokud je to IN, vše pod ním bude hlouběji
       if (isIn) {
         indentLevel++;
       }
@@ -75,14 +66,12 @@ export default function ExperianTraceUltra() {
   const handleEditorWillMount = (monaco: any) => {
     monaco.languages.register({ id: 'pcsm-trace' });
 
-    // CSS pro Breakpointy
     if (typeof document !== 'undefined') {
       const style = document.createElement('style');
       style.innerHTML = `.myBreakpoint { background: #ff4444; border-radius: 50%; width: 12px!important; height: 12px!important; margin-left: 5px; }`;
       document.head.appendChild(style);
     }
 
-    // Barevné zvýraznění (upraveno na tvou syntaxi s hvězdičkami)
     monaco.languages.setMonarchTokensProvider('pcsm-trace', {
       tokenizer: {
         root: [
@@ -96,7 +85,6 @@ export default function ExperianTraceUltra() {
       }
     });
 
-    // Definice folding markerů - TEĎ TO BUDE FUNGOVAT
     monaco.languages.setLanguageConfiguration('pcsm-trace', {
       folding: {
         markers: {
@@ -138,16 +126,45 @@ export default function ExperianTraceUltra() {
   };
 
   return (
-    <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', background: '#0f172a', color: 'white' }}>
+    <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', background: '#0f172a', color: 'white', fontFamily: 'sans-serif' }}>
       <header style={{ padding: '10px 20px', borderBottom: '1px solid #334155', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
           <h1 style={{ fontSize: '1.2rem', margin: 0 }}>Experian Trace Ultra-View 🔴</h1>
           <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>{fileName}</div>
         </div>
-        <button onClick={formatTraceLogic} style={{ padding: '8px 15px', background: '#22c55e', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>
-          🪄 Re-Format & Enable Folding
-        </button>
+        
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+          {/* Vylepšený upload button */}
+          <label style={{ 
+            padding: '8px 15px', 
+            background: '#334155', 
+            borderRadius: '4px', 
+            cursor: 'pointer', 
+            fontSize: '0.8rem',
+            border: '1px solid #475569'
+          }}>
+            📁 Nahrát soubor
+            <input type="file" onChange={handleFileUpload} style={{ display: 'none' }} />
+          </label>
+
+          <button 
+            onClick={formatTraceLogic} 
+            style={{ 
+              padding: '8px 15px', 
+              background: '#22c55e', 
+              color: 'white', 
+              border: 'none', 
+              borderRadius: '4px', 
+              cursor: 'pointer', 
+              fontWeight: 'bold',
+              fontSize: '0.8rem'
+            }}
+          >
+            🪄 Re-Format & Folding
+          </button>
+        </div>
       </header>
+
       <div style={{ flex: 1 }}>
         <Editor
           height="100%"
@@ -159,7 +176,7 @@ export default function ExperianTraceUltra() {
             fontSize: 13,
             glyphMargin: true,
             folding: true,
-            foldingStrategy: 'indentation', // Důležité pro tvou odsazenou strukturu
+            foldingStrategy: 'indentation',
             showFoldingControls: 'always',
             lineNumbers: 'on',
             minimap: { enabled: true },
