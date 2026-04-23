@@ -28,11 +28,10 @@ export default function ExperianTraceUltra() {
       continue;
     }
 
-    // 1. Pokud řádek začíná OUT, musíme snížit úroveň PŘED vytvořením řádku,
-    // aby OUT lícovalo se svým otevíracím IN.
-    if (line.match(/^OUT\s*:/i)) {
-      indentLevel = Math.max(0, indentLevel - 1);
-    }
+// Hledá OUT: nebo OUT : (včetně případných mezer po stranách)
+if (line.match(/^OUT\s*:/i)) {
+  indentLevel = Math.max(0, indentLevel - 1);
+}
 
     // 2. Výpočet odsazení pro aktuální řádek
     let currentLineIndent = indentLevel;
@@ -40,17 +39,18 @@ export default function ExperianTraceUltra() {
     // Speciální pravidlo pro VALUE: Chceme ho mít vizuálně "pod" předchozím řádkem,
     // ale nesmí to ovlivnit indentLevel pro zbytek vnořeného bloku.
     if (line.match(/^VALUE\s*:/i)) {
-      currentLineIndent += 1;
-    }
+  currentLineIndent += 1;
+}
 
     // 3. Přidání zformátovaného řádku do pole
     newLines.push(tab.repeat(currentLineIndent) + line);
 
     // 4. Pokud řádek začíná IN, zvýšíme úroveň pro VŠECHNY následující řádky,
     // dokud nenarazíme na odpovídající OUT. Tím dosáhneme rekurze.
-    if (line.match(/^IN\s*:/i)) {
-      indentLevel++;
-    }
+    // Podobně pro IN (pro jistotu, kdyby se i tam mezera ztratila)
+if (line.match(/^IN\s*:/i)) {
+  indentLevel++;
+}
   }
 
   // Přepsání obsahu editoru zformátovaným textem
